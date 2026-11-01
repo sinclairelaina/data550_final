@@ -15,57 +15,23 @@ It's important to emphasize that this report uses a *synthetic* Kaggle dataset (
 
 ```{r, setup, echo = FALSE, warning = FALSE, message = FALSE}
 library(knitr)
-library(dplyr)
 library(gtsummary)
-library(ggplot2)
 
 opts_chunk$set(
   echo = FALSE,
   warning = FALSE,
   message = FALSE
 )
-```
 
-
-```{r, clean-data}
-here::i_am("final/code/final_project_assignment_2.Rmd")
-absolute_path_to_data <- here::here("final/raw_data/alzheimers_disease_data.csv")
-data <- read.csv(absolute_path_to_data, header = TRUE)
-
-data <- data |>
-  select(-PatientID, -DoctorInCharge) |> #Don't need PatientID and DoctorInCharge is XXXConfid in every row -> not useful
-  mutate(
-    Diagnosis = factor(Diagnosis, levels = 0:1, labels = c("No Alzheimer's", "Alzheimer's")),
-    Gender = factor(Gender, levels = 0:1, labels = c("Male", "Female")),
-    Ethnicity = factor(Ethnicity, levels = 0:3,
-                       labels = c("White", "Black", "Asian", "Other")),
-    EducationLevel = factor(EducationLevel, levels = 0:3,
-                            labels = c("None", "High School", "Bachelor's", "Higher")),
-    across(c(Smoking, FamilyHistoryAlzheimers, Hypertension,
-             MemoryComplaints, BehavioralProblems),
-           ~ factor(.x, levels = 0:1, labels = c("No", "Yes")))
-  )
+# The data cleaning, tables, and figure are produced by the scripts in code/
+# (run via the Makefile); this report only loads their saved output.
+here::i_am("code/final_project_report.Rmd")
 ```
 
 # Descriptive Analysis
 
 ```{r, table1}
-data |>
-  mutate(Diagnosis = factor(Diagnosis, levels = c("Alzheimer's", "No Alzheimer's"))) |>
-  select(Diagnosis, Age, Gender, Ethnicity, EducationLevel, BMI, Smoking,
-         FamilyHistoryAlzheimers, Hypertension, MMSE, FunctionalAssessment, ADL) |>
-  tbl_summary(by = Diagnosis,
-              statistic = list(all_continuous() ~ "{mean} ({sd})",
-                               all_categorical() ~ "{n} ({p}%)"),
-              digits = all_continuous() ~ 1,
-              label = list(EducationLevel ~ "Education",
-                           FamilyHistoryAlzheimers ~ "Family History of AD",
-                           FunctionalAssessment ~ "Functional Assessment")) |>
-  add_overall() |>
-  add_p(test = all_continuous() ~ "t.test") |>
-  modify_caption("**Table 1. Patient characteristics by Alzheimer's diagnosis**
-                 <br>(continuous variables: mean (SD); categorical variables: n (%))") |>
-  bold_labels()
+readRDS(here::here("tables", "table1.rds"))
 ```
 
 
@@ -74,17 +40,7 @@ Table 1 summarizes the characteristics of the 2,149 patients in the dataset, ove
 # Regression Analysis
 
 ```{r, regression}
-model <- glm(Diagnosis ~ Age + Gender + MMSE + FunctionalAssessment + ADL +
-               MemoryComplaints + BehavioralProblems,
-             data = data, family = binomial)
-
-tbl_regression(model, exponentiate = TRUE,
-               label = list(FunctionalAssessment ~ "Functional Assessment",
-                            MemoryComplaints ~ "Memory Complaints",
-                            BehavioralProblems ~ "Behavioral Problems")) |>
-  modify_caption("**Table 2. Logistic regression of Alzheimer's diagnosis**") |>
-  bold_labels() |>
-  bold_p()
+readRDS(here::here("tables", "table2.rds"))
 ```
 
 
@@ -92,21 +48,8 @@ Table 2 shows odds ratios (ORs) and 95% confidence intervals from a logistic reg
 
 # Figure
 
-```{r, figure-scores, fig.width = 9, fig.height = 4}
-data |>
-  mutate(Diagnosis = factor(Diagnosis, levels = c("Alzheimer's", "No Alzheimer's"))) |>
-  select(Diagnosis, MMSE, FunctionalAssessment, ADL) |>
-  tidyr::pivot_longer(-Diagnosis, names_to = "measure", values_to = "score") |>
-  mutate(measure = factor(measure,
-                          levels = c("MMSE", "FunctionalAssessment", "ADL"),
-                          labels = c("Mini-Mental State Examination (MMSE, 0-30)", "Functional Assessment (0-10)", "Activities of Daily Living (ADL, 0-10)"))) |>
-  ggplot(aes(x = Diagnosis, y = score, fill = Diagnosis)) +
-  scale_fill_manual(values = c("Alzheimer's" = "#eb6834", "No Alzheimer's" = "#2a78d6")) +
-  geom_boxplot(show.legend = FALSE) +
-  facet_wrap(~ measure, scales = "free_y") +
-  labs(x = NULL, y = "Score",
-       title = "Cognitive and Functional Scores by Alzheimer's Diagnosis") +
-  theme_minimal()
+```{r, figure-scores}
+knitr::include_graphics(here::here("figures", "figure1.png"))
 ```
 
 Figure 1 shows the distributions of the three cognitive and functional scores by Alzheimer's diagnosis status. On all three measures, patients with Alzheimer's (orange) had lower scores than patients without Alzheimer's (blue), indicating greater impairment. Median MMSE was 11.6 in the Alzheimer's group vs. 17.1 in the no-Alzheimer's group. Median Functional Assessment and ADL scores were each about 3 (Alzheimer's) vs. about 6 (No Alzheimer's). The gap in scores is widest for Functional Assessment and ADL, where the middle 50% of scores for the Alzheimer's group is mostly below the middle 50% for the no-Alzheimer's group. Even so, the two groups overlap substantially on every measure, and scores in both groups span nearly the full possible range. These visual patterns are consistent with the mean differences in Table 1 and with the odds ratios in Table 2.
